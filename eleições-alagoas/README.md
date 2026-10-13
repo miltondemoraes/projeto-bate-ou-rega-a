@@ -50,6 +50,26 @@ Jogo educativo de matemática para crianças, feito em **Godot 4.6**. É inspira
 4. O alvo vira um "boneco de pano" e é **arremessado em arco** (parábola), girando no ar, com a câmera acompanhando de lado.
 5. Ele cai no mar com respingos e ondas circulares ("TCHIBUM!") e fica boiando. Se ainda tiver vida, afunda e reaparece no deck. Se não tiver, fica boiando com uma **boia laranja**.
 
+## Sons
+Nenhum arquivo de áudio é importado. Todos os sons são **sintetizados por código** em `scripts/sfx.gd` quando o jogo abre (leva cerca de 0,2 s), a partir de ondas senoidais, quadradas e dente de serra e de ruído filtrado. Cada som é guardado como `AudioStreamWAV`.
+
+| Momento | Som |
+|---|---|
+| Fundo | mar com ondas indo e vindo (loop) |
+| Botões / travar a barra | clique |
+| Nova pergunta | "plim-plim" |
+| Últimos 5 segundos | tique-taque cada vez mais agudo |
+| Acertou / errou | arpejo de vitória / buzina grave |
+| Robô vai bater | bipes de robô |
+| Passos no deck | batidinhas na madeira |
+| Barra de força | zumbido cujo tom sobe e desce com o marcador |
+| Braço varrendo | whoosh curto |
+| **O tapa** | estalo (ruído agudo) + "tum" grave; no tapa perfeito, também um "ding" |
+| Voo | whoosh longo + "ôôôh" da plateia |
+| Queda no mar | splash com bolhinhas |
+| Volta ao deck | "boing" |
+| Fim de jogo | fanfarra (vitória) ou trombone triste (derrota) |
+
 ## Estrutura do código
 ```
 scenes/main.tscn      cena principal (só o nó raiz com main.gd)
@@ -60,6 +80,7 @@ scripts/fighter.gd    boneco articulado (cabeça, braços e pernas com pivôs) +
 scripts/questions.gd  gerador de perguntas por dificuldade (com explicação da resposta)
 scripts/ui.gd         menu, placar, perguntas, barra de força, telas de fim
 scripts/prim.gd       fábrica de formas primitivas
+scripts/sfx.gd        sintetizador de efeitos sonoros
 ```
 
 ## Executar

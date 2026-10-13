@@ -2,6 +2,8 @@ extends Node3D
 
 const Prim = preload("res://scripts/prim.gd")
 
+signal stepped
+
 var id := ""
 var display_name := ""
 var tagline := ""
@@ -29,6 +31,7 @@ var charging := false
 var floating := false
 var _t := 0.0
 var _float_base := 0.0
+var _last_step := 0.0
 var _buoy: Node3D
 
 
@@ -109,6 +112,9 @@ func _process(delta: float) -> void:
 		return
 	if walking:
 		var s := sin(_t * 12.0)
+		if signf(s) != signf(_last_step):
+			stepped.emit()
+		_last_step = s
 		leg_l.rotation.x = s * 0.6
 		leg_r.rotation.x = -s * 0.6
 		arm_l.rotation.x = -s * 0.5

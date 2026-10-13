@@ -7,6 +7,7 @@ signal answer_picked(index: int)
 signal target_picked(index: int)
 signal restart_requested
 signal menu_requested
+signal clicked
 
 const YELLOW := Color(1.0, 0.82, 0.1)
 const NAVY := Color(0.03, 0.15, 0.3, 0.88)
@@ -104,6 +105,7 @@ func _button(text: String, bg: Color, font_size := 24, min_size := Vector2(0, 56
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
+	b.pressed.connect(func(): clicked.emit())
 	b.custom_minimum_size = min_size
 	b.add_theme_font_size_override("font_size", font_size)
 	b.add_theme_stylebox_override("normal", _sb(bg, 14, bg.darkened(0.4), 3))

@@ -5,6 +5,7 @@ const World = preload("res://scripts/world.gd")
 const Characters = preload("res://scripts/characters.gd")
 const Questions = preload("res://scripts/questions.gd")
 const GameUI = preload("res://scripts/ui.gd")
+const Sfx = preload("res://scripts/sfx.gd")
 
 const SPOTS := [Vector3(-4.5, 0, 0.5), Vector3(-1.5, 0, 0.5), Vector3(1.5, 0, 0.5), Vector3(4.5, 0, 0.5)]
 const DIFFICULTY := {
@@ -31,6 +32,8 @@ var difficulty := "facil"
 var questions := Questions.new()
 var ui: GameUI
 var camera: Camera3D
+var sfx: Sfx
+var _last_tick := 0
 
 var state := "menu"
 var time_left := 0.0
@@ -57,12 +60,15 @@ var _clock := 0.0
 
 func _ready() -> void:
 	randomize()
+	sfx = Sfx.new()
+	add_child(sfx)
 	World.build(self)
 	for i in Characters.ROSTER.size():
 		var f = Characters.create(Characters.ROSTER[i])
 		f.home = SPOTS[i]
 		f.position = f.home
 		add_child(f)
+		f.stepped.connect(_on_step)
 		fighters.append(f)
 	camera = Camera3D.new()
 	camera.fov = 55
@@ -79,6 +85,7 @@ func _ready() -> void:
 	ui.answer_picked.connect(_on_answer)
 	ui.restart_requested.connect(_start_game)
 	ui.menu_requested.connect(_show_menu)
+	ui.clicked.connect(sfx.play.bind("click", -6.0))
 	ui.select_difficulty(difficulty)
 	_show_menu()
 
@@ -86,6 +93,7 @@ func _ready() -> void:
 func _show_menu() -> void:
 	state = "menu"
 	Engine.time_scale = 1.0
+	sfx.hum(false)
 	cam_follow = null
 	for f in fighters:
 		f.reset_for_game()
@@ -132,6 +140,8 @@ func _start_game() -> void:
 	cam_pos = Vector3(4, 4, 4)
 	cam_look = Vector3(11, 4, -9)
 	ui.show_banner("Bem-vindos ao Marco dos Corais!", GameUI.YELLOW, "Maceió - Alagoas", 2.0)
+	sfx.play("correct", -4.0, 1.0, 0.0)
+	sfx.play("crowd", -8.0)
 	await _wait(2.4)
 	_set_overview()
 	ui.show_banner("Você é %s!" % player.display_name, Color(0.4, 1, 0.5), "Acerte as contas para dar tapas nos robôs", 1.8)
@@ -148,6 +158,8 @@ func _play_round() -> void:
 	current_q = questions.generate(difficulty)
 	time_left = DIFFICULTY[difficulty].time
 	ui.show_question(current_q, round_num)
+	sfx.play("chime", -6.0, 1.0, 0.0)
+	_last_tick = int(ceil(time_left))
 	state = "question"
 	var idx: int = await answered
 	ui.lock_answers(idx, current_q)
@@ -158,6 +170,8 @@ func _play_round() -> void:
 		score += bonus
 		ui.set_score(score)
 		ui.show_banner("ACERTOU!  +%d" % bonus, Color(0.4, 1, 0.5), "", 1.2)
+		sfx.play("correct", -2.0, 1.0, 0.0)
+		sfx.play("crowd", -10.0)
 		await _wait(1.4)
 		ui.hide_question()
 		var target = await _choose_target()
@@ -166,10 +180,12 @@ func _play_round() -> void:
 		misses += 1
 		var title := "TEMPO ESGOTADO!" if idx < 0 else "ERROU!"
 		ui.show_banner(title, Color(1, 0.4, 0.4), "Resposta certa: %s" % current_q.explain, 2.8)
+		sfx.play("wrong", -8.0, 1.0, 0.0)
 		await _wait(3.0)
 		ui.hide_question()
 		var attacker = _alive_bots().pick_random()
 		ui.show_banner("%s (robô) vai bater!" % attacker.display_name, Color(1, 0.6, 0.2), "", 1.2)
+		sfx.play("robot", -9.0)
 		await _wait(1.2)
 		await _slap(attacker, player)
 
@@ -202,7 +218,10 @@ func _end_game(won: bool) -> void:
 		cam_pos = player.home + Vector3(0, 1.8, 4.5)
 		cam_look = player.home + Vector3(0, 1.2, 0)
 		player.celebrate()
+		sfx.play("fanfare", -6.0, 1.0, 0.0)
+		sfx.play("crowd", -4.0)
 	else:
+		sfx.play("lose", -2.0, 1.0, 0.0)
 		cam_pos = player.position + Vector3(0, 4, 8)
 		cam_look = player.position + Vector3(0, 1, 0)
 	ui.show_end(won, player.display_name, score, hits, misses)
@@ -233,6 +252,7 @@ func _slap(attacker, target) -> void:
 	ui.show_power_bar(bar_player, attacker.display_name)
 	state = "power"
 	var v: float = await power_locked
+	sfx.hum(false)
 	var grade := _grade(v)
 	var power := _power_from(v)
 	ui.show_power_result(grade)
@@ -240,8 +260,12 @@ func _slap(attacker, target) -> void:
 		score += {"perfeito": 50, "forte": 30, "fraco": 10}[grade]
 		ui.set_score(score)
 
+	sfx.play("whoosh", -4.0, 1.2)
 	await attacker.swing()
 	target.hit_react()
+	sfx.play("slap", 0.0, 0.85 if grade == "perfeito" else 1.0)
+	if grade == "perfeito":
+		sfx.play("ding", -6.0, 1.0, 0.0)
 	_impact_fx(target.global_position + Vector3(0, 1.85, 0))
 	ui.pow_text(POW_WORDS.pick_random())
 	shake = 0.35
@@ -255,8 +279,11 @@ func _slap(attacker, target) -> void:
 	cam_follow = target
 	cam_smooth = 6.0
 	attacker.recover()
+	sfx.play("whoosh_long", -3.0, 0.8 + power * 0.4)
+	sfx.play("crowd", -8.0)
 	var landing: Vector3 = await target.launch(dir, power, World.WATER_Y)
 	_splash(Vector3(landing.x, World.WATER_Y, landing.z))
+	sfx.play("splash", 0.0)
 	shake = 0.25
 	ui.pow_text("TCHIBUM!")
 	target.lives -= 1
@@ -270,6 +297,8 @@ func _slap(attacker, target) -> void:
 		cam_pos = target.position + Vector3(0, 3.5, 7)
 		cam_look = target.position + Vector3(0, 1, 0)
 		var who: String = "Você" if target.is_player else target.display_name
+		if not target.is_player:
+			sfx.play("crowd", -5.0, 1.15)
 		ui.show_banner("%s caiu fora!" % who, Color(0.6, 0.9, 1.0), "Boiando no mar de Maceió...", 1.6)
 		await _wait(1.8)
 		_set_overview()
@@ -277,6 +306,7 @@ func _slap(attacker, target) -> void:
 			return
 	else:
 		target.respawn()
+		get_tree().create_timer(0.5).timeout.connect(sfx.play.bind("boing", -5.0))
 		_set_overview()
 	await attacker.walk_to(attacker.home, 1.0)
 	await attacker.turn_to_angle(0.0, 0.2)
@@ -311,9 +341,14 @@ func _bot_goal() -> float:
 	return randf_range(0.2, 0.45)
 
 
+func _on_step() -> void:
+	sfx.play("step", -14.0, 1.0, 0.15)
+
+
 func _lock_power() -> void:
 	if state == "power":
 		state = "busy"
+		sfx.play("click", -2.0, 1.4, 0.0)
 		power_locked.emit(bar_value)
 
 
@@ -378,12 +413,17 @@ func _process(delta: float) -> void:
 		"question":
 			time_left -= delta
 			ui.set_timer(time_left / DIFFICULTY[difficulty].time)
+			var sec := int(ceil(time_left))
+			if sec < _last_tick and sec <= 5 and sec > 0:
+				sfx.play("tick", -6.0, 1.0 + (5 - sec) * 0.08, 0.0)
+			_last_tick = sec
 			if time_left <= 0.0:
 				_on_answer(-1)
 		"power":
 			bar_time += delta
 			bar_value = pingpong(bar_time * DIFFICULTY[difficulty].bar_speed, 1.0)
 			ui.set_power(bar_value)
+			sfx.hum(true, bar_value)
 			if not bar_player and bar_time > 0.9 and (absf(bar_value - bot_goal) < 0.03 or bar_time > 5.0):
 				_lock_power()
 			elif bar_player and bar_time > 7.0:
